@@ -1,17 +1,17 @@
-#!/usr/bin/python
 ################################################################################################################
 ## # https://stackoverflow.com/questions/26371237/reindexing-elastic-search-via-bulk-api-scan-and-scroll
 ## # https://stackoverflow.com/questions/32285596/elasticsearch-python-re-index-data-after-changing-the-mappings
 ## # GET _sql/_explain?sql=select _index, silk_script_release.keyword FROM filebeat-silk-log-* WHERE tags = '_sumary_report' GROUP BY _index, silk_script_release.keyword ORDER BY _index
-## # GET _sql/_explain?sql=select silk_script.keyword, silk_transaction.keyword, silk_script_segment.keyword, silk_transaction_status.keyword,  silk_script_release.keyword, user_profile.keyword, silk_transaction_seq.keyword, AVG(silk_transaction_time) as max_time, MIN(@timestamp_start) as timestamp_start FROM filebeat-silk-log-* WHERE tags = '_sumary_report' GROUP BY  silk_script.keyword, silk_script_release.keyword, silk_transaction.keyword, silk_script_segment.keyword, silk_transaction_status.keyword, silk_script_release.keyword, user_profile.keyword, silk_transaction_seq.keyword
+## # GET _sql/_explain?sql=select silk_script.keyword, silk_transaction.keyword, silk_script_segment.keyword, silk_script_release.keyword, silk_transaction_status.keyword,  AVG(silk_transaction_time) as result_time, MIN(@timestamp_start) as timestamp_start FROM filebeat-silk-log-* WHERE  silk_transaction_status.keyword = 'Trans. ok[s]' OR silk_transaction_status.keyword = 'Trans. failed[s]' GROUP BY  silk_script.keyword, silk_transaction.keyword, silk_script_segment.keyword, silk_script_release.keyword, silk_transaction_status.keyword
+
 ## #
 ## # autor: Leandro Sampaio Silva
 ## # Objetivo: Upload dos percentuais a serem considerados durante a analise comparativa dos releases do Silk
-## # V 0.0.0  
+## # V 0.0.0
 ################################################################################################################
 from elasticsearch import Elasticsearch, helpers
-es = Elasticsearch([{'host': 'localhost'}])
-
+#es = Elasticsearch(['10.31.75.70:80/elastic'])
+es = Elasticsearch([{'host': '192.168.56.110'}])
 search_1 = es.search(index="filebeat-silk-log-*", body= {
   "from" : 0,
   "size" : 0,
@@ -79,41 +79,23 @@ search_2 = es.search(index="filebeat-silk-log-*", body= {
             "must" : [
               {
                 "bool" : {
-                  "must" : [
+                  "should" : [
                     {
                       "match_phrase" : {
-                        "tags" : {
-                          "query" : "_sumary_report",
+                        "silk_transaction_status.keyword" : {
+                          "query" : "Trans. ok[s]",
                           "slop" : 0,
                           "boost" : 1.0
                         }
                       }
                     },
                     {
-                      "bool" : {
-                        "should" : [
-                          {
-                            "match_phrase" : {
-                              "silk_transaction_status.keyword" : {
-                                "query" : "Trans. ok[s]",
-                                "slop" : 0,
-                                "boost" : 1.0
-                              }
-                            }
-                          },
-                          {
-                            "match_phrase" : {
-                              "silk_transaction_status.keyword" : {
-                                "query" : "Trans. failed[s]",
-                                "slop" : 0,
-                                "boost" : 1.0
-                              }
-                            }
-                          }
-                        ],
-                        "disable_coord" : False,
-                        "adjust_pure_negative" : True,
-                        "boost" : 1.0
+                      "match_phrase" : {
+                        "silk_transaction_status.keyword" : {
+                          "query" : "Trans. failed[s]",
+                          "slop" : 0,
+                          "boost" : 1.0
+                        }
                       }
                     }
                   ],
@@ -141,8 +123,6 @@ search_2 = es.search(index="filebeat-silk-log-*", body= {
       "silk_script_segment.keyword",
       "silk_script_release.keyword",
       "silk_transaction_status.keyword",
-      "user_profile.keyword",
-      "silk_transaction_seq",
       "AVG",
       "MIN"
     ],
@@ -153,9 +133,7 @@ search_2 = es.search(index="filebeat-silk-log-*", body= {
     "silk_transaction.keyword",
     "silk_script_segment.keyword",
     "silk_script_release.keyword",
-    "silk_transaction_status.keyword",
-    "user_profile.keyword",
-    "silk_transaction_seq"
+    "silk_transaction_status.keyword"
   ],
   "aggregations" : {
     "silk_script.keyword" : {
@@ -182,6 +160,14 @@ search_2 = es.search(index="filebeat-silk-log-*", body= {
             "min_doc_count" : 1,
             "shard_min_doc_count" : 0,
             "show_term_doc_count_error" : False,
+            "order" : [
+              {
+                "_count" : "desc"
+              },
+              {
+                "_term" : "asc"
+              }
+            ]
           },
           "aggregations" : {
             "silk_script_segment.keyword" : {
@@ -191,6 +177,14 @@ search_2 = es.search(index="filebeat-silk-log-*", body= {
                 "min_doc_count" : 1,
                 "shard_min_doc_count" : 0,
                 "show_term_doc_count_error" : False,
+                "order" : [
+                  {
+                    "_count" : "desc"
+                  },
+                  {
+                    "_term" : "asc"
+                  }
+                ]
               },
               "aggregations" : {
                 "silk_script_release.keyword" : {
@@ -200,47 +194,41 @@ search_2 = es.search(index="filebeat-silk-log-*", body= {
                     "min_doc_count" : 1,
                     "shard_min_doc_count" : 0,
                     "show_term_doc_count_error" : False,
+                    "order" : [
+                      {
+                        "_count" : "desc"
+                      },
+                      {
+                        "_term" : "asc"
+                      }
+                    ]
                   },
-              "aggregations" : {
-                "silk_transaction_status.keyword" : {
-                  "terms" : {
-                    "field" : "silk_transaction_status.keyword",
-                    "size" : 10,
-                    "min_doc_count" : 1,
-                    "shard_min_doc_count" : 0,
-                    "show_term_doc_count_error" : False,
-                  },
-                      "aggregations" : {
-                        "user_profile.keyword" : {
-                          "terms" : {
-                            "field" : "user_profile.keyword",
-                            "size" : 10,
-                            "min_doc_count" : 1,
-                            "shard_min_doc_count" : 0,
-                            "show_term_doc_count_error" : False,
+                  "aggregations" : {
+                    "silk_transaction_status.keyword" : {
+                      "terms" : {
+                        "field" : "silk_transaction_status.keyword",
+                        "size" : 10,
+                        "min_doc_count" : 1,
+                        "shard_min_doc_count" : 0,
+                        "show_term_doc_count_error" : False,
+                        "order" : [
+                          {
+                            "_count" : "desc"
                           },
-                          "aggregations" : {
-                            "silk_transaction_seq" : {
-                              "terms" : {
-                                "field" : "silk_transaction_seq",
-                                "size" : 1000,
-                                "min_doc_count" : 1,
-                                "shard_min_doc_count" : 0,
-                                "show_term_doc_count_error" : False,
-                              },
-                              "aggregations" : {
-                                "result_time" : {
-                                  "min" : {
-                                    "field" : "silk_transaction_time"
-                                  }
-                                },
-                                "timestamp_start" : {
-                                  "min" : {
-                                    "field" : "@timestamp_start"
-                                  }
-                                }
-                              }
-                            }
+                          {
+                            "_term" : "asc"
+                          }
+                        ]
+                      },
+                      "aggregations" : {
+                        "result_time" : {
+                          "avg" : {
+                            "field" : "silk_transaction_time"
+                          }
+                        },
+                        "timestamp_start" : {
+                          "min" : {
+                            "field" : "@timestamp_start"
                           }
                         }
                       }
@@ -275,23 +263,22 @@ for index_loop in search_1['aggregations']['_index']['buckets']:
             idx_pst.append(release_loop['key'])
 
 while len(idx_pst) > 0 :
-    
+
     for script_loop in search_2['aggregations']['silk_script.keyword']['buckets']:
-    
+
         for transaction_loop in script_loop['silk_transaction.keyword']['buckets']:
-    
+
             for segment_loop in transaction_loop['silk_script_segment.keyword']['buckets']:
-    
+
                 if any(idx_pst[0] == dic['key'] for dic in segment_loop['silk_script_release.keyword']['buckets']):
-    
+
                     idx_new = {}
                     idx_new['_index'] =  IDX + SUFIX + date.today().strftime("%Y-%d-%m")
                     idx_new['_type'] = 'py_custom';
                     idx_new['_doc_type'] = 'py_custom';
-                    #idx_new['_op_type'] = 'update'
                     idx_new['_source'] = {};
-    
-    
+
+
                     for release_loop in segment_loop['silk_script_release.keyword']['buckets']:
     
                         result_ok_time = 0
@@ -301,22 +288,18 @@ while len(idx_pst) > 0 :
                         timestamp_start = ''
                         
                         for status_loop in release_loop['silk_transaction_status.keyword']['buckets']:
-                        
-                            for profile_loop in status_loop['user_profile.keyword']['buckets'] :
-                                
-                                for seq_loop in profile_loop['silk_transaction_seq']['buckets'] :
-    
-                                    timestamp_start = seq_loop['timestamp_start']['value_as_string']
-                                    
-                                    if status_loop['key'] == 'Trans. ok[s]' :
-                                        result_ok_time += seq_loop['result_time']['value']
-                                        result_ok_count = status_loop['doc_count']
-                                        
-                                    elif status_loop['key'] == 'Trans. failed[s]' :
-                                        
-                                        result_nok_count = status_loop['doc_count']
-                                
-                        result_ok_time = result_ok_time/result_ok_count if result_ok_count else 0 
+
+                            timestamp_start = status_loop['timestamp_start']['value_as_string']
+
+                            if status_loop['key'] == 'Trans. ok[s]' :
+                                result_ok_time = status_loop['result_time']['value']
+                                result_ok_count = status_loop['doc_count']
+
+                            elif status_loop['key'] == 'Trans. failed[s]' :
+
+                                result_nok_count = status_loop['doc_count']
+
+                         
                         
                         if (idx_pst[0] == release_loop['key']) :
                             
@@ -326,13 +309,13 @@ while len(idx_pst) > 0 :
                             idx_new['_source']['silk_script_release'] = release_loop['key']
                             idx_new['_source']['silk_transaction'] = transaction_loop['key']
                             idx_new['_source']['silk_script_segment'] = segment_loop['key']
-    
+
                             idx_new['_source']['time_ok'] = result_ok_time
                             idx_new['_source']['count_nok'] = result_nok_count
                             idx_new['_source']['count_ok'] = result_ok_count
-    
+
                             idx_new['_source']['@timestamp_start'] = timestamp_start
-                                
+
                         else :
                             
                             if (len(idx_pst) > 1 and idx_pst[1] == release_loop['key']) :
@@ -352,7 +335,7 @@ while len(idx_pst) > 0 :
                     
                     from decimal import Decimal
                     if (idx_new['_source']['time_ok']) :
-    
+
                         if (idx_new['_source']['value_ref1']) :
                             idx_new['_source']['percent_ref1'] = float(round(Decimal(((idx_new['_source']['value_ref1']/idx_new['_source']['time_ok']) -1)*100),2))
                         elif (idx_new['_source']['value_ref1'] == 0) :
@@ -373,9 +356,10 @@ while len(idx_pst) > 0 :
                         idx_new['_source']['percent_ref1'] = 0
                         idx_new['_source']['percent_ref2'] = 0
                         idx_new['_source']['percent_ref3'] = 0
-                    
+                        
                     update_data.append(idx_new)
     idx_pst.pop(0)
 
 helpers.bulk(es,update_data)
 es.indices.refresh(index= IDX + SUFIX + date.today().strftime("%Y-%d-%m"))
+

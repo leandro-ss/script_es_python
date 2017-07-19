@@ -4,7 +4,6 @@
 ## # https://stackoverflow.com/questions/32285596/elasticsearch-python-re-index-data-after-changing-the-mappings
 ##
 ## # autor: Leandro Sampaio Silva
-## # Objetivo: Upload dos percentuais a serem considerados durante a analise comparativa dos releases do Silk
 ## # V 0.0.0  
 ################################################################################################################
 import jaydebeapi
@@ -33,23 +32,30 @@ class Cursor_Extent (jaydebeapi.Cursor):
 from pytz     import utc, timezone
 from datetime import date, datetime, timedelta
 
+import sys
+
+if len(sys.argv) < 3 :
+    
+
+
 def time_in_minute(dt, minus_time):
     return datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute) - timedelta( minutes=minus_time)
 
 def time_with_tz(dt):
     return datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute,tzinfo = timezone('America/Sao_Paulo')) 
 
-
 conn = jaydebeapi.connect("com.wily.introscope.jdbc.IntroscopeDriver",
-                          "jdbc:introscope:net//Inmetrics:@localhost:5432", ["",""],
-                          "C:\dev\workspace_python\lib\IntroscopeJDBC.jar",)
-
+                          "jdbc:introscope:net//Inmetrics:@10.58.78.211:5010", ["",""],
+#                          "/opt/elkserv/script/driver/IntroscopeJDBC.jar",)
+                          "C:\dev\workspace_python\INMENTRICS_SCOPE2ELK\lib\IntroscopeJDBC.jar",)
 curs = Cursor_Extent(conn, jaydebeapi._converters )
 
 dt_ini = time_in_minute(datetime.today(), 1).strftime("%m/%d/%Y %H:%M:%S")
 dt_end = time_in_minute(datetime.today(), 0).strftime("%m/%d/%Y %H:%M:%S")
 
-sql = "select * from metric_data where agent = '.*SHWT060CTO.*'  and metric='.*' and timestamp between '"+dt_ini+"' and '"+dt_end+"'"
+#sql = "select * from metric_data where agent = '.*SHWT060CTO.*'  and metric='.*' and timestamp between '"+dt_ini+"' and '"+dt_end+"'"
+#sql = "select * from metric_data where agent = '.*SHWXH0002CLD.*'  and metric='.*' and timestamp between '07/14/2017 09:30:00' and '07/14/2017 12:00:00'"
+sql = "select * from metric_data where agent = '.*shwxh0003cld.*'  and metric='.*' and timestamp between '07/14/2017 09:30:00' and '07/14/2017 12:00:00'"
 
 curs.execute_statement(sql)
 
