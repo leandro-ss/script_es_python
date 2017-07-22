@@ -10,8 +10,7 @@
 ################################################################################################################
 from elasticsearch import Elasticsearch, helpers
 
-#es = Elasticsearch(['10.31.75.70:80/elastic'])
-es = Elasticsearch([{'host': '192.168.56.110'}])
+es = Elasticsearch([{'host': 'elk_one'}])
 
 search_1 = es.search(index="filebeat-silk-log-*", body= {
   "from" : 0,
@@ -324,7 +323,7 @@ while len(idx_pst) > 0 :
                         idx_new['_source']['percent_ref1'] = float(0)
                         idx_new['_source']['percent_ref2'] = float(0)
                         idx_new['_source']['percent_ref3'] = float(0)
-
+                    print (idx_new)
                     update_data.append(idx_new)
     idx_pst.pop(0)
 
