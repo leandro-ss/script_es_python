@@ -1,12 +1,6 @@
 ################################################################################################################
 ## # https://stackoverflow.com/questions/26371237/reindexing-elastic-search-via-bulk-api-scan-and-scroll
 ## # https://stackoverflow.com/questions/32285596/elasticsearch-python-re-index-data-after-changing-the-mappings
-## # GET _sql/_explain?sql=select _index, silk_script_release.keyword FROM filebeat-silk-log-* WHERE tags = '_sumary_report' GROUP BY _index, silk_script_release.keyword ORDER BY _index
-## # GET _sql/_explain?sql=select silk_script.keyword, silk_transaction.keyword, silk_script_segment.keyword, silk_script_release.keyword, silk_transaction_status.keyword,  AVG(silk_transaction_time) as result_time, MIN(@timestamp_start) as timestamp_start FROM filebeat-silk-log-* WHERE  silk_transaction_status.keyword = 'Trans. ok[s]' OR silk_transaction_status.keyword = 'Trans. failed[s]' GROUP BY  silk_script.keyword, silk_transaction.keyword, silk_script_segment.keyword, silk_script_release.keyword, silk_transaction_status.keyword
-
-## # autor: Leandro Sampaio Silva
-## # Objetivo: Upload dos percentuais a serem considerados durante a analise comparativa dos releases do Silk
-
 ################################################################################################################
 from elasticsearch import Elasticsearch, helpers
 
@@ -138,15 +132,7 @@ search_2 = es.search(index="filebeat-silk-log-*", body= {
         "size" : 200,
         "min_doc_count" : 1,
         "shard_min_doc_count" : 0,
-        "show_term_doc_count_error" : False,
-        "order" : [
-          {
-            "_count" : "desc"
-          },
-          {
-            "_term" : "asc"
-          }
-        ]
+        "show_term_doc_count_error" : False
       },
       "aggregations" : {
         "silk_transaction.keyword" : {
@@ -155,7 +141,7 @@ search_2 = es.search(index="filebeat-silk-log-*", body= {
             "size" : 10,
             "min_doc_count" : 1,
             "shard_min_doc_count" : 0,
-            "show_term_doc_count_error" : False,
+            "show_term_doc_count_error" : False
           },
           "aggregations" : {
             "silk_script_segment.keyword" : {
@@ -164,7 +150,7 @@ search_2 = es.search(index="filebeat-silk-log-*", body= {
                 "size" : 10,
                 "min_doc_count" : 1,
                 "shard_min_doc_count" : 0,
-                "show_term_doc_count_error" : False,
+                "show_term_doc_count_error" : False
               },
               "aggregations" : {
                 "silk_script_release.keyword" : {
@@ -173,7 +159,7 @@ search_2 = es.search(index="filebeat-silk-log-*", body= {
                     "size" : 10,
                     "min_doc_count" : 1,
                     "shard_min_doc_count" : 0,
-                    "show_term_doc_count_error" : False,
+                    "show_term_doc_count_error" : False
                   },
                   "aggregations" : {
                     "silk_transaction_status.keyword" : {
@@ -182,7 +168,7 @@ search_2 = es.search(index="filebeat-silk-log-*", body= {
                         "size" : 10,
                         "min_doc_count" : 1,
                         "shard_min_doc_count" : 0,
-                        "show_term_doc_count_error" : False,
+                        "show_term_doc_count_error" : False
                       },
                       "aggregations" : {
                         "result_time" : {
@@ -190,9 +176,9 @@ search_2 = es.search(index="filebeat-silk-log-*", body= {
                             "field" : "silk_transaction_time"
                           }
                         },
-                        "timestamp_start" : {
+                        "timestamp" : {
                           "min" : {
-                            "field" : "@timestamp_start"
+                            "field" : "@timestamp"
                           }
                         }
                       }
@@ -213,9 +199,7 @@ update_data = []
 from pytz import utc
 from datetime import date, datetime
 
-
-
-IDX = 'python-silk-'; SUFIX = 'percent-';
+IDX_PERCENT = 'python-silk-percent'
 
 idx_pst = list()
 idx_unq = set()
@@ -239,7 +223,7 @@ while len(idx_pst) > 0 :
                 if any(idx_pst[0] == dic['key'] for dic in segment_loop['silk_script_release.keyword']['buckets']):
 
                     idx_new = {}
-                    idx_new['_index'] =  IDX + SUFIX + date.today().strftime("%Y-%d-%m")
+                    idx_new['_index'] =  IDX_PERCENT
                     idx_new['_type'] = 'py_custom';
                     idx_new['_doc_type'] = 'py_custom';
                     idx_new['_source'] = {};
@@ -254,7 +238,7 @@ while len(idx_pst) > 0 :
 
                         for status_loop in release_loop['silk_transaction_status.keyword']['buckets']:
 
-                            timestamp_start = status_loop['timestamp_start']['value_as_string']
+                            timestamp = status_loop['timestamp']['value_as_string']
 
                             if status_loop['key'] == 'Trans. ok[s]' :
 
@@ -278,27 +262,28 @@ while len(idx_pst) > 0 :
                             idx_new['_source']['count_nok'] = result_nok_count
                             idx_new['_source']['count_ok'] = result_ok_count
 
-                            idx_new['_source']['@timestamp_start'] = timestamp_start
+                            idx_new['_source']['@timestamp'] = timestamp
+                            idx_new['_source']['@timestamp_import'] = datetime.now(utc)
 
-                            idx_new['_source']['percent_ref1'] = 0
-                            idx_new['_source']['percent_ref2'] = 0
-                            idx_new['_source']['percent_ref3'] = 0
+                            idx_new['_source']['percent_ref1'] = float(0)
+                            idx_new['_source']['percent_ref2'] = float(0)
+                            idx_new['_source']['percent_ref3'] = float(0)
 
 
                         if (len(idx_pst) > 1 and idx_pst[1] == release_loop['key']) :
                             idx_new['_source']['value_ref1'] = result_ok_time
                         elif 'value_ref1' not in idx_new['_source'] :
-                            idx_new['_source']['value_ref1'] = 0
+                            idx_new['_source']['value_ref1'] = float(0)
 
                         if (len(idx_pst) > 2 and idx_pst[2] == release_loop['key']) :
                             idx_new['_source']['value_ref2'] = result_ok_time
                         elif 'value_ref2' not in idx_new['_source'] :
-                            idx_new['_source']['value_ref2'] = 0
+                            idx_new['_source']['value_ref2'] = float(0)
 
                         if (len(idx_pst) > 3 and idx_pst[3] == release_loop['key']) :
                             idx_new['_source']['value_ref3'] = result_ok_time
                         elif 'value_ref3' not in idx_new['_source'] :
-                            idx_new['_source']['value_ref3'] = 0
+                            idx_new['_source']['value_ref3'] = float(0)
 
                     from decimal import Decimal
                     if (idx_new['_source']['time_ok']) :
@@ -323,9 +308,9 @@ while len(idx_pst) > 0 :
                         idx_new['_source']['percent_ref1'] = float(0)
                         idx_new['_source']['percent_ref2'] = float(0)
                         idx_new['_source']['percent_ref3'] = float(0)
-                    print (idx_new)
+
                     update_data.append(idx_new)
     idx_pst.pop(0)
 
 helpers.bulk(es,update_data)
-es.indices.refresh(index= IDX + SUFIX + date.today().strftime("%Y-%d-%m"))
+es.indices.refresh(index= IDX_PERCENT)

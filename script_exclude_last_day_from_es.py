@@ -2,12 +2,7 @@
 ################################################################################################################
 ## # https://stackoverflow.com/questions/26371237/reindexing-elastic-search-via-bulk-api-scan-and-scroll
 ## # https://stackoverflow.com/questions/32285596/elasticsearch-python-re-index-data-after-changing-the-mappings
-##
-## # autor: Leandro Sampaio Silva
-## # Objetivo: Upload dos percentuais a serem considerados durante a analise comparativa dos releases do Silk
-## # V 0.0.0  
 ################################################################################################################
-
 from datetime import date,datetime, timedelta
 
 def previous_month(dt):

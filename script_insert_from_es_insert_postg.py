@@ -1,7 +1,7 @@
 #!/usr/bin/python
 from elasticsearch import Elasticsearch
 
-es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
+es = Elasticsearch([{'host': 'elk_one'}])
 
 res = es.search(index="filebeat-access-*", body={
     "aggs" :{
