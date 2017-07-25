@@ -1,3 +1,6 @@
+#!/usr/bin/python
+###########################################################################
+
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan as es_scan
 import jmespath

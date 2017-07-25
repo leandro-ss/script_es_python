@@ -11,7 +11,7 @@ def previous_month(dt):
 
 from elasticsearch import Elasticsearch
 
-es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
+es = Elasticsearch([{'host': 'elk_one'}])
    
 for index in es.indices.get('*'):
     if previous_month(date.today()).strftime("%Y.%m.%d") in index:

@@ -1,11 +1,13 @@
-#connect to our cluster
+#!/usr/bin/python
+###########################################################################
+# https://squirro.com/2013/03/12/elasticsearch-and-joining/
+###########################################################################
 from elasticsearch import Elasticsearch
-es = Elasticsearch([{'host': '10:31.75.70:80/elastic'}])
+es = Elasticsearch([{'host': 'elk_one'}])
 
-# delete index if exists
 if es.indices.exists('test-index'):
     es.indices.delete(index='test-index')
-# index settings
+
 SETTINGS = {
     "settings": {
         "number_of_shards": 1,
@@ -21,14 +23,7 @@ SETTINGS = {
         }
      }
 }
-# create index
 es.indices.create(index='test-index', body=SETTINGS)
-
-# ignore 400 cause by IndexAlreadyExistsException when creating an index
-#es.indices.create(index='test-index', ignore=400)
 
 # ignore 404 and 400
 es.indices.delete(index='test-index', params={"ignore" : [400, 404]})
-
-# connect to localhost directly and another node using SSL on port 443
-# and an url_prefix. Note that ``port`` needs to be an int.

@@ -32,9 +32,8 @@ class Cursor_Extent (jaydebeapi.Cursor):
 from pytz     import utc, timezone
 from datetime import date, datetime, timedelta
 
-import sys
-
-if len(sys.argv) < 3 :
+#import sys
+#if len(sys.argv) < 3 :
     
 
 
@@ -46,7 +45,7 @@ def time_with_tz(dt):
 
 conn = jaydebeapi.connect("com.wily.introscope.jdbc.IntroscopeDriver",
                           "jdbc:introscope:net//Inmetrics:@10.58.78.211:5010", ["",""],
-#                          "/opt/elkserv/script/driver/IntroscopeJDBC.jar",)
+                          #"/opt/elkserv/script/driver/IntroscopeJDBC.jar",)
                           "C:\dev\workspace_python\INMENTRICS_SCOPE2ELK\lib\IntroscopeJDBC.jar",)
 curs = Cursor_Extent(conn, jaydebeapi._converters )
 

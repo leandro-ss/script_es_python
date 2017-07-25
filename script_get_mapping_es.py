@@ -1,3 +1,6 @@
+#!/usr/bin/python
+###########################################################################
+
 #connect to our cluster
 from elasticsearch import Elasticsearch
 es = Elasticsearch([{'host': 'elk_one'}])

@@ -1,9 +1,12 @@
+#!/usr/bin/python
+###########################################################################
 import json
 import requests
 from elasticsearch import Elasticsearch, helpers
+
 es = Elasticsearch([{"host": "elk_one"}])
 
-settings = {
+SETTINGS = {
     "settings": {
         "number_of_shards": 1,
         "number_of_replicas": 0
@@ -20,30 +23,35 @@ settings = {
     }
 }
 
-es.indices.create(index="test-documents", body = settings)
+if es.indices.exists("test-documents") :
+    es.indices.delete(index="test-documents")
 
-es.index(index="test-documents", doc_type="document", id=1, body=
-{
+es.indices.create(index="test-documents", body = SETTINGS)
+
+result = es.index(index="test-documents", doc_type="document", id=1, body={
     "title": "Habemus Papam",
     "content": "In Rome, white smoke rose from the chimney atop of the Sistine Chapel.",
     "date": "2013-03-10T12:12:12"
 })
+print (result)
 
-es.index(index="test-documents", doc_type="comment", id=2, body=
-{
+result = es.index(index="test-documents", doc_type="comment", id=2, body={
     "text": "Finally!",
     "author": "Jane Roe",
     "date": "2013-03-12T13:13:13"
 }, params={"parent":1})
+print (result)
 
-es.index(index="test-documents", doc_type="comment", id=3, body=
-{
+result = es.index(index="test-documents", doc_type="comment", id=3, body={
     "text": "Oh my god ...",
     "author": "John Doe",
     "date": "2013-03-11T14:14:14"
 }, params={"parent":1})
+print (result)
 
-search=es.search(index="test-documents", doc_type= "document", body= {
+print(es.indices.refresh(index= "test-documents"))
+
+result = es.search(index="test-documents", doc_type= "document", body= {
   "query": {
     "bool": {
       "must" : [{ "match": {"title": "papam"} }],
@@ -64,6 +72,4 @@ search=es.search(index="test-documents", doc_type= "document", body= {
   }
 })
 
-print(json.dumps(search, indent=4))
-
-es.indices.delete (index="test-documents")
+print(json.dumps(result, indent=4, sort_keys=True))

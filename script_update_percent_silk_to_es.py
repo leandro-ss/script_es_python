@@ -1,3 +1,4 @@
+#!/usr/bin/python
 ################################################################################################################
 ## # https://stackoverflow.com/questions/26371237/reindexing-elastic-search-via-bulk-api-scan-and-scroll
 ## # https://stackoverflow.com/questions/32285596/elasticsearch-python-re-index-data-after-changing-the-mappings
