@@ -1,5 +1,7 @@
 #!/usr/bin/python
 ###########################################################################
+# https://squirro.com/2013/03/12/elasticsearch-and-joining/
+###########################################################################
 import json
 import requests
 from elasticsearch import Elasticsearch, helpers
