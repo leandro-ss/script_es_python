@@ -34,8 +34,6 @@ from datetime import date, datetime, timedelta
 
 #import sys
 #if len(sys.argv) < 3 :
-    
-
 
 def time_in_minute(dt, minus_time):
     return datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute) - timedelta( minutes=minus_time)
