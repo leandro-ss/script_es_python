@@ -196,23 +196,27 @@ search_2 = es.search(index="filebeat-silk-log-*", body= {
 })
 
 update_data = []
-
+import re
 from pytz import utc
 from datetime import date, datetime
 
 IDX_PERCENT = 'python-silk-percent'
 
 idx_pst = list()
-idx_unq = set()
 
 for index_loop in search_1['aggregations']['_index']['buckets']:
 
     for release_loop in index_loop['silk_script_release.keyword']['buckets']:
 
-        if (release_loop['key'] not in idx_unq) :
-            idx_unq.add(release_loop['key'])
+        if (release_loop['key'] not in idx_pst) :
             idx_pst.append(release_loop['key'])
 
+prog = re.compile("^Baseline")
+
+baseline = next(release for release in idx_pst if prog.match(release))
+
+print (baseline)
+print (idx_pst)
 while len(idx_pst) > 0 :
 
     for script_loop in search_2['aggregations']['silk_script.keyword']['buckets']:
@@ -269,7 +273,7 @@ while len(idx_pst) > 0 :
                             idx_new['_source']['percent_ref1'] = float(0)
                             idx_new['_source']['percent_ref2'] = float(0)
                             idx_new['_source']['percent_ref3'] = float(0)
-
+                            idx_new['_source']['percent_baseline'] = float(0)
 
                         if (len(idx_pst) > 1 and idx_pst[1] == release_loop['key']) :
                             idx_new['_source']['value_ref1'] = result_ok_time
@@ -286,6 +290,11 @@ while len(idx_pst) > 0 :
                         elif 'value_ref3' not in idx_new['_source'] :
                             idx_new['_source']['value_ref3'] = float(0)
 
+                        if (baseline is not None and baseline == release_loop['key']) :                              
+                            idx_new['_source']['value_baseline'] = result_ok_time
+                        elif 'value_baseline' not in idx_new['_source'] :
+                            idx_new['_source']['value_baseline'] = float(0)
+                            
                     from decimal import Decimal
                     if (idx_new['_source']['time_ok']) :
 
@@ -304,14 +313,21 @@ while len(idx_pst) > 0 :
                         elif (idx_new['_source']['value_ref3'] == 0) :
                             idx_new['_source']['percent_ref3'] = float(0)
 
+                        if (idx_new['_source']['value_baseline']) :
+                            idx_new['_source']['percent_baseline'] = float(round(Decimal(((idx_new['_source']['value_baseline']/idx_new['_source']['time_ok']) -1)*100),2))
+                        elif (idx_new['_source']['value_baseline'] == 0) :
+                            idx_new['_source']['percent_baseline'] = float(0)
+
                     else :
 
                         idx_new['_source']['percent_ref1'] = float(0)
                         idx_new['_source']['percent_ref2'] = float(0)
                         idx_new['_source']['percent_ref3'] = float(0)
+                        idx_new['_source']['percent_baseline'] = float(0)
 
                     update_data.append(idx_new)
+                    #print (idx_new)
     idx_pst.pop(0)
 
-helpers.bulk(es,update_data)
-es.indices.refresh(index= IDX_PERCENT)
+#helpers.bulk(es,update_data)
+#es.indices.refresh(index= IDX_PERCENT)
