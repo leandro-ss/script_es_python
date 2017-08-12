@@ -7,6 +7,15 @@
 ## # V 0.0.0  
 ################################################################################################################
 import jaydebeapi
+import sys
+
+if len(sys.argv) < 2 or len(sys.argv) > 2 :
+    raise ValueError('Favor reportar somente um dos projetos mapeados: cc, i30h ou mob')
+elif ( sys.argv[1] != 'cc' and sys.argv[1] != 'mob' and sys.argv[1] != 'i30h' ) :
+    raise ValueError('Favor reportar somente um dos projetos mapeados: cc, i30h ou mob')
+
+_arg = sys.argv[1]
+
 
 class Cursor_Extent (jaydebeapi.Cursor):
     def execute_statement(self, operation, parameters=None):
@@ -72,9 +81,9 @@ for row in curs.fetchall():
     idx_new['_source']['process'] = row[2]
     idx_new['_source']['resource'] = row[4]
     idx_new['_source']['value'] = row[13]
-    
+
     update_data.append(idx_new)
-    
+
 curs.close()
 conn.close()
 

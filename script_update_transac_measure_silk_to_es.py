@@ -21,7 +21,7 @@ def create_index(index_name):
 def estimate_percent(base, time):
     """
     """
-    return float(round(Decimal(((baseline/time) -1)*100), 2))
+    return float(round(Decimal(((base/time) -1)*100), 2))
 
 
 
@@ -245,8 +245,160 @@ search_2 = es.search(index="filebeat-silk-log-*", body={
     }
 })
 
+search_3 = es.search(index="filebeat-silk-log-*", body={
+    "from" : 0,
+    "size" : 0,
+    "_source" : {
+        "includes" : [
+            "silk_project.keyword",
+            "silk_script.keyword",
+            "silk_transaction.keyword",
+            "silk_script_segment.keyword",
+            "silk_script_release.keyword",
+            "silk_measure.keyword",
+            "AVG",
+            "MIN"
+        ],
+        "excludes" : []
+    },
+    "stored_fields" : [
+        "silk_project.keyword",
+        "silk_script.keyword",
+        "silk_transaction.keyword",
+        "silk_script_segment.keyword",
+        "silk_script_release.keyword",
+        "silk_measure.keyword"
+    ],
+    "aggregations" : {
+        "silk_project.keyword" : {
+            "terms" : {
+                "field" : "silk_project.keyword",
+                "size" : 200,
+                "min_doc_count" : 1,
+                "shard_min_doc_count" : 0,
+                "show_term_doc_count_error" : False,
+                "order" : [
+                    {
+                        "_count" : "desc"
+                    },
+                    {
+                        "_term" : "asc"
+                    }
+                ]
+            },
+            "aggregations" : {
+                "silk_script.keyword" : {
+                    "terms" : {
+                        "field" : "silk_script.keyword",
+                        "size" : 10,
+                        "min_doc_count" : 1,
+                        "shard_min_doc_count" : 0,
+                        "show_term_doc_count_error" : False,
+                        "order" : [
+                            {
+                                "_count" : "desc"
+                            },
+                            {
+                                "_term" : "asc"
+                            }
+                        ]
+                    },
+                    "aggregations" : {
+                        "silk_transaction.keyword" : {
+                            "terms" : {
+                                "field" : "silk_transaction.keyword",
+                                "size" : 10,
+                                "min_doc_count" : 1,
+                                "shard_min_doc_count" : 0,
+                                "show_term_doc_count_error" : False,
+                                "order" : [
+                                    {
+                                        "_count" : "desc"
+                                    },
+                                    {
+                                        "_term" : "asc"
+                                    }
+                                ]
+                            },
+                            "aggregations" : {
+                                "silk_script_segment.keyword" : {
+                                    "terms" : {
+                                        "field" : "silk_script_segment.keyword",
+                                        "size" : 10,
+                                        "min_doc_count" : 1,
+                                        "shard_min_doc_count" : 0,
+                                        "show_term_doc_count_error" : False,
+                                        "order" : [
+                                            {
+                                                "_count" : "desc"
+                                            },
+                                            {
+                                                "_term" : "asc"
+                                            }
+                                        ]
+                                    },
+                                    "aggregations" : {
+                                        "silk_script_release.keyword" : {
+                                            "terms" : {
+                                                "field" : "silk_script_release.keyword",
+                                                "size" : 10,
+                                                "min_doc_count" : 1,
+                                                "shard_min_doc_count" : 0,
+                                                "show_term_doc_count_error" : False,
+                                                "order" : [
+                                                    {
+                                                        "_count" : "desc"
+                                                    },
+                                                    {
+                                                        "_term" : "asc"
+                                                    }
+                                                ]
+                                            },
+                                            "aggregations" : {
+                                                "silk_measure.keyword" : {
+                                                    "terms" : {
+                                                        "field" : "silk_measure.keyword",
+                                                        "size" : 10,
+                                                        "min_doc_count" : 1,
+                                                        "shard_min_doc_count" : 0,
+                                                        "show_term_doc_count_error" : False,
+                                                        "order" : [
+                                                            {
+                                                                "_count" : "desc"
+                                                            },
+                                                            {
+                                                                "_term" : "asc"
+                                                            }
+                                                        ]
+                                                    },
+                                                    "aggregations" : {
+                                                        "measure_time" : {
+                                                            "avg" : {
+                                                                "field" : "silk_measure_time"
+                                                            }
+                                                        },
+                                                        "timestamp" : {
+                                                            "min" : {
+                                                                "field" : "@timestamp"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+})
+
+
 project_dct = dict()
-update_data = list()
 
 for index_loop in search_1['aggregations']['_index']['buckets']:
 
@@ -262,6 +414,9 @@ for index_loop in search_1['aggregations']['_index']['buckets']:
                 project_dct[project_loop['key']].append(release_loop['key'])
 
 for project_loop in search_2['aggregations']['silk_project.keyword']['buckets']:
+
+    update_data = list()
+    final_data = list()
 
     idx_percent = 'python-silk-percent-'+str(project_loop['key']).lower()
 
@@ -331,5 +486,38 @@ for project_loop in search_2['aggregations']['silk_project.keyword']['buckets']:
                         update_data.append(idx_new)
         idx_pst.pop(0)
 
-    helpers.bulk(es, update_data)
+    measure_prt_loop = next((next_project for next_project in search_3['aggregations']['silk_project.keyword']['buckets'] if next_project['key'] == project_loop['key']), None)
+
+    for script_loop in measure_prt_loop['silk_script.keyword']['buckets']:
+
+        for transaction_loop in script_loop['silk_transaction.keyword']['buckets']:
+
+            for segment_loop in transaction_loop['silk_script_segment.keyword']['buckets']:
+
+                for release_loop in segment_loop['silk_script_release.keyword']['buckets']:
+
+                    key = script_loop['key']+release_loop['key']+transaction_loop['key']+segment_loop['key']
+
+                    baseline = next((release for release in idx_pst if re.compile("^Baseline").match(release)), None)
+
+                    for data in update_data:
+
+                        if key == data['_id']:
+
+                            for measure_loop in release_loop['silk_measure.keyword']['buckets']:
+                                data['_id'] = script_loop['key']+release_loop['key']+transaction_loop['key']+segment_loop['key']+measure_loop['key']
+
+                                data['_source']['silk_measure'] = measure_loop['key']
+                                data['_source']['measure_time_ok'] = measure_loop['measure_time']['value']
+                                data['_source']['measure_count_ok'] = measure_loop['doc_count']
+                                final_data.append(data)
+
+                        elif not data['_source'].get('silk_measure'):
+
+                            data['_source']['silk_measure'] = 'Inexistente'
+                            data['_source']['measure_time_ok'] = float(0)
+                            data['_source']['measure_count_ok'] = int(0)
+                            final_data.append(data)
+
+    helpers.bulk(es, final_data)
     es.indices.refresh(index=idx_percent)
