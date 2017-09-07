@@ -10,19 +10,25 @@ es = Elasticsearch([{'host': 'elk_one'}])
 
 
 def create_index(index_name):
-    idx = {}
-    idx['_index'] = index_name
-    idx['_type'] = 'py_custom'
-    idx['_doc_type'] = 'py_custom'
-    idx['_source'] = {}
+    """
+    """
+    init_idx = {}
+    init_idx['_index'] = index_name
+    init_idx['_type'] = 'py_custom'
+    init_idx['_type_op'] = 'upsert'
+    init_idx['_source'] = {}
 
-    return idx
+    return init_idx
 
 def estimate_percent(base, time):
     """
     """
-    return float(round(Decimal(((base/time) -1)*100), 2))
+    return trunc_value(((base/time) -1)*100)
 
+def trunc_value(value):
+    """
+    """
+    return float(round(Decimal(value), 2))
 
 
 search_1 = es.search(index="filebeat-silk-log-*", body={
@@ -131,9 +137,7 @@ search_2 = es.search(index="filebeat-silk-log-*", body={
                                     "boost" : 1.0
                                 }
                             },
-                            #{ "match" : { "silk_script.keyword" : "16_Trn_TEDMinhasContas" }},#TESTE
-                            #{ "match" : { "silk_project.keyword" : "Internet30Horas2017" }},#TESTE
-
+                            { "match" : { "silk_script.keyword" : "16_Trn_TEDMinhasContas" }},#TESTE
                         ],
                         "disable_coord" : False,
                         "adjust_pure_negative" : True,
@@ -397,7 +401,6 @@ search_3 = es.search(index="filebeat-silk-log-*", body={
     }
 })
 
-
 project_dct = dict()
 
 for index_loop in search_1['aggregations']['_index']['buckets']:
@@ -415,14 +418,14 @@ for index_loop in search_1['aggregations']['_index']['buckets']:
 
 for project_loop in search_2['aggregations']['silk_project.keyword']['buckets']:
 
-    update_data = list()
-    final_data = list()
+    update_idx = list()
+    result_idx = list()
 
-    idx_percent = 'python-silk-percent-'+str(project_loop['key']).lower()
+    idx_name = 'python-silk-percent-'+str(project_loop['key']).lower()
 
     idx_pst = project_dct[project_loop['key']]
 
-    baseline = next((release for release in idx_pst if re.compile("^Baseline").match(release)), None)
+    baseline = next((release for release in idx_pst if re.match("^Baseline",release)), None)
 
     while len(idx_pst) > 0:
 
@@ -434,11 +437,12 @@ for project_loop in search_2['aggregations']['silk_project.keyword']['buckets']:
 
                     if any(idx_pst[0] == dic['key'] for dic in segment_loop['silk_script_release.keyword']['buckets']):
 
-                        idx_new = create_index(idx_percent)
+                        idx = create_index(idx_name)
 
                         for release_loop in segment_loop['silk_script_release.keyword']['buckets']:
 
                             result_ok_time = float(0)
+                            result_nok_time = float(0)
                             result_nok_count = int(0)
                             result_ok_count = int(0)
 
@@ -450,40 +454,43 @@ for project_loop in search_2['aggregations']['silk_project.keyword']['buckets']:
 
                                 if status_loop['key'] == 'Trans. ok[s]':
 
-                                    result_ok_time = status_loop['result_time']['value']
+                                    result_ok_time = trunc_value(status_loop['result_time']['value'])
                                     result_ok_count = status_loop['doc_count']
 
                                 elif status_loop['key'] == 'Trans. failed[s]':
 
+                                    result_nok_time = trunc_value(status_loop['result_time']['value'])
                                     result_nok_count = status_loop['doc_count']
 
                             if idx_pst[0] == release_loop['key']:
 
-                                idx_new['_id'] = script_loop['key']+release_loop['key']+transaction_loop['key']+segment_loop['key']
+                                idx['_id'] = script_loop['key']+release_loop['key']+transaction_loop['key']+segment_loop['key']
 
-                                idx_new['_source']['silk_script'] = script_loop['key']
-                                idx_new['_source']['silk_script_release'] = release_loop['key']
-                                idx_new['_source']['silk_transaction'] = transaction_loop['key']
-                                idx_new['_source']['silk_script_segment'] = segment_loop['key']
+                                idx['_source']['silk_script'] = script_loop['key']
 
-                                idx_new['_source']['trasaction_time_ok'] = result_ok_time
-                                idx_new['_source']['trasaction_count_nok'] = result_nok_count
-                                idx_new['_source']['trasaction_count_ok'] = result_ok_count
+                                idx['_source']['silk_projetc'] = project_loop['key']
+                                idx['_source']['silk_script_release'] = release_loop['key']
+                                idx['_source']['silk_transaction'] = transaction_loop['key']
+                                idx['_source']['silk_script_segment'] = segment_loop['key']
 
-                                idx_new['_source']['@timestamp'] = timestamp
-                                idx_new['_source']['@timestamp_import'] = datetime.now(utc)
+                                idx['_source']['trasaction_time_ok'] = result_ok_time
+                                idx['_source']['trasaction_count_nok'] = result_nok_count
+                                idx['_source']['trasaction_count_ok'] = result_ok_count
+
+                                idx['_source']['@timestamp'] = timestamp
+                                idx['_source']['@timestamp_import'] = datetime.now(utc)
 
                             if baseline == release_loop['key']:
-                                idx_new['_source']['transaction_baseline'] = result_ok_time
-                            elif 'transaction_baseline' not in idx_new['_source']:
-                                idx_new['_source']['transaction_baseline'] = float(0)
+                                idx['_source']['transaction_baseline'] = result_ok_time
+                            elif 'transaction_baseline' not in idx['_source']:
+                                idx['_source']['transaction_baseline'] = float(0)
 
-                        if idx_new['_source'].get('trasaction_time_ok') and idx_new['_source'].get('transaction_baseline'):
-                            idx_new['_source']['percent_baseline'] = estimate_percent(idx_new['_source']['transaction_baseline'], idx_new['_source']['trasaction_time_ok'])
+                        if idx['_source'].get('trasaction_time_ok') and idx['_source'].get('transaction_baseline'):
+                            idx['_source']['percent_baseline'] = estimate_percent(idx['_source']['transaction_baseline'], idx['_source']['trasaction_time_ok'])
                         else:
-                            idx_new['_source']['percent_baseline'] = float(0)
+                            idx['_source']['percent_baseline'] = float(0)
 
-                        update_data.append(idx_new)
+                        update_idx.append(idx)
         idx_pst.pop(0)
 
     measure_prt_loop = next((next_project for next_project in search_3['aggregations']['silk_project.keyword']['buckets'] if next_project['key'] == project_loop['key']), None)
@@ -500,24 +507,24 @@ for project_loop in search_2['aggregations']['silk_project.keyword']['buckets']:
 
                     baseline = next((release for release in idx_pst if re.compile("^Baseline").match(release)), None)
 
-                    for data in update_data:
+                    for idx in update_idx:
 
-                        if key == data['_id']:
+                        if key == idx['_id']:
 
                             for measure_loop in release_loop['silk_measure.keyword']['buckets']:
-                                data['_id'] = script_loop['key']+release_loop['key']+transaction_loop['key']+segment_loop['key']+measure_loop['key']
+                                idx['_id'] = script_loop['key']+release_loop['key']+transaction_loop['key']+segment_loop['key']+measure_loop['key']
 
-                                data['_source']['silk_measure'] = measure_loop['key']
-                                data['_source']['measure_time_ok'] = measure_loop['measure_time']['value']
-                                data['_source']['measure_count_ok'] = measure_loop['doc_count']
-                                final_data.append(data)
+                                idx['_source']['silk_measure'] = measure_loop['key']
+                                idx['_source']['measure_time_ok'] = measure_loop['measure_time']['value']
+                                idx['_source']['measure_count_ok'] = measure_loop['doc_count']
+                                result_idx.append(idx)
 
-                        elif not data['_source'].get('silk_measure'):
+                        elif not idx['_source'].get('silk_measure'):
 
-                            data['_source']['silk_measure'] = 'Inexistente'
-                            data['_source']['measure_time_ok'] = float(0)
-                            data['_source']['measure_count_ok'] = int(0)
-                            final_data.append(data)
+                            idx['_source']['silk_measure'] = 'n/a'
+                            idx['_source']['measrure_time_ok'] = float(0)
+                            idx['_source']['measure_count_ok'] = int(0)
+                            result_idx.append(idx)
 
-    helpers.bulk(es, final_data)
-    es.indices.refresh(index=idx_percent)
+    helpers.bulk(es, result_idx)
+    es.indices.refresh(index=idx_name)
