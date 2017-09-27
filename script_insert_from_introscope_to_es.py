@@ -1,21 +1,8 @@
-#!/usr/bin/python
-################################################################################################################
-## # https://stackoverflow.com/questions/26371237/reindexing-elastic-search-via-bulk-api-scan-and-scroll
-## # https://stackoverflow.com/questions/32285596/elasticsearch-python-re-index-data-after-changing-the-mappings
-##
+##################################################################################################################
 ## # autor: Leandro Sampaio Silva
-## # V 0.0.0  
+## # V 0.0.0
 ################################################################################################################
 import jaydebeapi
-import sys
-
-if len(sys.argv) < 2 or len(sys.argv) > 2 :
-    raise ValueError('Favor reportar somente um dos projetos mapeados: cc, i30h ou mob')
-elif ( sys.argv[1] != 'cc' and sys.argv[1] != 'mob' and sys.argv[1] != 'i30h' ) :
-    raise ValueError('Favor reportar somente um dos projetos mapeados: cc, i30h ou mob')
-
-_arg = sys.argv[1]
-
 
 class Cursor_Extent (jaydebeapi.Cursor):
     def execute_statement(self, operation, parameters=None):
@@ -41,9 +28,6 @@ class Cursor_Extent (jaydebeapi.Cursor):
 from pytz     import utc, timezone
 from datetime import date, datetime, timedelta
 
-#import sys
-#if len(sys.argv) < 3 :
-
 def time_in_minute(dt, minus_time):
     return datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute) - timedelta( minutes=minus_time)
 
@@ -52,16 +36,13 @@ def time_with_tz(dt):
 
 conn = jaydebeapi.connect("com.wily.introscope.jdbc.IntroscopeDriver",
                           "jdbc:introscope:net//Inmetrics:@10.58.78.211:5010", ["",""],
-                          #"/opt/elkserv/script/driver/IntroscopeJDBC.jar",)
-                          "C:\dev\workspace_python\INMENTRICS_SCOPE2ELK\lib\IntroscopeJDBC.jar",)
+                          "/opt/perfcenter/portal-capacidade/integracao/driver/IntroscopeJDBC.jar",)
 curs = Cursor_Extent(conn, jaydebeapi._converters )
 
 dt_ini = time_in_minute(datetime.today(), 1).strftime("%m/%d/%Y %H:%M:%S")
 dt_end = time_in_minute(datetime.today(), 0).strftime("%m/%d/%Y %H:%M:%S")
 
-#sql = "select * from metric_data where agent = '.*SHWT060CTO.*'  and metric='.*' and timestamp between '"+dt_ini+"' and '"+dt_end+"'"
-#sql = "select * from metric_data where agent = '.*SHWXH0002CLD.*'  and metric='.*' and timestamp between '07/14/2017 09:30:00' and '07/14/2017 12:00:00'"
-sql = "select * from metric_data where agent = '.*shwxh0003cld.*'  and metric='.*' and timestamp between '07/14/2017 09:30:00' and '07/14/2017 12:00:00'"
+sql = "select * from metric_data where agent = '.*SHWT060CTO.*'  and metric='.*' and timestamp between '"+dt_ini+"' and '"+dt_end+"'"
 
 curs.execute_statement(sql)
 
@@ -88,7 +69,7 @@ curs.close()
 conn.close()
 
 from elasticsearch import Elasticsearch,helpers
-es = Elasticsearch([{'host': '10.31.75.70', 'port': 9200}])
+es = Elasticsearch([{'host': '10.31.75.70'}])
 
 helpers.bulk(es,update_data)
 
