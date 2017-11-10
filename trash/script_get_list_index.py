@@ -12,4 +12,4 @@ indices_list = schema.keys()
 just_indices = [index for index in indices_list if not index.startswith(".")] ## remove the objects created by marvel, e.g. ".marvel-date"
 
 import json
-for index in just_indices: print( index)
+for index in just_indices: print(index)

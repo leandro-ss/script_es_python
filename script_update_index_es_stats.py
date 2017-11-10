@@ -151,27 +151,9 @@ def start_export():
 
         del cp_metric['stats']
         del cp_metric['calcular_percentis']
-        new_idx = create_index(cp_metric)
-        update_data.append(new_idx)
+        idx = create_index(cp_metric)
+        update_data.append(idx)
 
-      count=0
-      while count <100:
-
-        if count not in vmetric['calcular_percentis']:    
-          cp_metric = copy.deepcopy(vmetric)
-          cp_metric['percentile'] = count
-          
-          cp_metric['before'] = data1[int(len_1/100*count)][1]
-          cp_metric['after' ] = data2[int(len_2/100*count)][1]
-
-          cp_metric["@timestamp_relative"]  = datetime.fromtimestamp(data2[int(len_2/100*count)][0]/1000)
-
-          del cp_metric['stats']
-          del cp_metric['calcular_percentis']
-          new_idx = create_index(data=cp_metric)
-          update_data.append(new_idx)
-        count+=5
-  
   insert_ES(update_data)
 
 if __name__ == '__main__':
