@@ -51,11 +51,11 @@ def time_with_tz(dt):
   return datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute,tzinfo = timezone('America/Sao_Paulo')) 
 
 def auth_handler():
-  auth_handler = HTTPBasicAuthHandler()
-  auth_handler.add_password(
-    realm='django-tastypie', uri=ROOT_URL,
-    user='lessilva', passwd='mokona69'
-  )
+    auth_handler = HTTPBasicAuthHandler()
+    auth_handler.add_password(
+        realm='django-tastypie', uri=ROOT_URL,
+        user='lessilva', passwd='mokona69'
+    )
   return build_opener(auth_handler)
 
 def create_index(data, index_name=DFT_IDX):

@@ -2,19 +2,14 @@
 ## # autor: Leandro Sampaio Silva
 ## # V 0.0.0
 ################################################################################################################
-import re
 import jaydebeapi
+import util
 import psycopg2
 import psycopg2.extras
-from pytz     import utc, timezone
-from datetime import date, datetime, timedelta
-from elasticsearch import Elasticsearch,helpers
+from pytz     import utc
+from datetime import date, datetime
 
 #######################################################################################################################
-
-ES = Elasticsearch([{"host": "192.168.56.110"}])
-
-BASE = "host=192.168.56.190 database=capacity  user=elk password=mokona69"
 
 IDX = "python-jdbc-introscope" + date.today().strftime("-%Y-%m-%d")
 
@@ -26,73 +21,21 @@ METRIC = "Frontends\\|Apps\\|([A-z -]*):"+\
          "Errors Per Interval|"+\
          ")"
 
-CTL_FILE = "integracao/.ctl_exec_scope"
-
 #######################################################################################################################
 
-def get_last_process_date():
-  try:
-
-    with open(CTL_FILE, 'r') as f:
-      line = f.readline()
-      if not line == '':
-        dt = line
-      else:
-        raise FileNotFoundError
-
-  except FileNotFoundError:
-    dt = time_in_minute(datetime.today(), 1).strftime("%Y-%m-%d %H:%M:%S").replace(" ", "%20")
-
-  return dt
-
-def set_last_process_date():
-    with open(CTL_FILE, 'w') as f:
-      f.writelines(time_in_minute(datetime.today(), 0).strftime("%Y-%m-%d %H:%M:%S").replace(" ", "%20"))
-
-def get_cursor_postgres():
-    # connect to the PostgreSQL database
-    conn = psycopg2.connect(BASE)
-    # create a new cursor
-    return  conn.cursor()
-
 def get_cursor_introscope():
-    # connect to introscope database
-    conn = jaydebeapi.connect("com.wily.introscope.jdbc.IntroscopeDriver",
-                            "jdbc:introscope:net//Inmetrics:@10.58.78.211:5010", ["",""],
-                            "/opt/perfcenter/portal-capacidade/integracao/driver/IntroscopeJDBC.jar",)
-    # create a new cursor
+    """ connect to the PostgreSQL database, create a new cursor
+    """
+    conn = jaydebeapi.connect(
+        "com.wily.introscope.jdbc.IntroscopeDriver",
+        "jdbc:introscope:net//Inmetrics:@10.58.78.211:5010", ["",""],
+        "/opt/perfcenter/portal-capacidade/integracao/driver/IntroscopeJDBC.jar",
+    )
     return Cursor_Extend(conn, jaydebeapi._converters)
 
-def get_list_server():
-
-    result = list()
-    try:
-        curs = get_cursor_postgres()
-
-        # execute the INSERT statement
-        curs.execute("SELECT hostname FROM inventario_servidor")
-        
-        result.append(row[1] for row in cur.fetchall())
-        
-    except (Exception, psycopg2.DatabaseError) as error:
-        raise error
-    finally:
-        if curs is not None:
-            curs.close()
-
-    return result
-
-def time_in_minute(dt, minus_time):
-    if minus_time < 0:
-        return datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute) - timedelta( minutes= - minus_time)
-    else:
-        return datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute) + timedelta( minutes= + minus_time)
-
-def time_with_tz(dt):
-    return datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute,tzinfo = timezone('America/Sao_Paulo')) 
-
-## Extends class to support a common statement
 class Cursor_Extend (jaydebeapi.Cursor):
+    """ Extends class to support a common statement
+    """
     def execute_statement(self, operation, parameters=None):
         if self._connection._closed:
             raise jaydebeapi.Error()
@@ -113,54 +56,65 @@ class Cursor_Extend (jaydebeapi.Cursor):
         else:
             jaydebeapi.rowcount = self._prep.getUpdateCount()
 
-if __name__=="__main__":
+def get_list_server():
 
-    dt  = get_last_process_date()
+    try:
+        curs = util.get_cursor_postgres()
+        curs.execute("SELECT hostname FROM inventario_servidor")
+        result = [row[1] for row in curs.fetchall()]
+        
+    except (Exception, psycopg2.DatabaseError) as error:
+        raise error
+    finally:
+        if curs is not None:
+            curs.close()
+
+    return result
+
+def start_process():
+    """
+    """
+
+    dt_process  = util.get_last_process_date()
     now = datetime.now(utc)
-
-    metric = METRIC
 
     update_data = []
 
     try:
-        for hostname in get_list_server():
 
-            curs = get_cursor_introscope()
+        curs = get_cursor_introscope()
 
-            dt_ini = time_in_minute(dt, -1).strftime("%m/%d/%Y %H:%M:%S")
-            dt_end = time_in_minute(dt,  0).strftime("%m/%d/%Y %H:%M:%S")
+        while  dt_process < now:
 
-            sql = "SELECT * FROM metric_data where agent = '.*"+hostname+".*' AND metric='"+metric+"' AND timestamp BETWEEN '"+dt_ini+"' AND '"+dt_end+"'"
+            for hostname in get_list_server():
 
-            curs.execute_statement(sql)
+                dt_ini = util.datetime_utc2local(util.time_in_minute(dt, -1)).strftime("%m/%d/%Y %H:%M:%S")
+                dt_end = util.datetime_utc2local(util.time_in_minute(dt,  0)).strftime("%m/%d/%Y %H:%M:%S")
 
-            for row in curs.fetchall():
-            
-                idx = {'_index': IDX}
+                sql = "SELECT * FROM metric_data where agent = '.*"+hostname+".*' AND metric='"+METRIC+"' AND timestamp BETWEEN '"+dt_ini+"' AND '"+dt_end+"'"
 
+                curs.execute_statement(sql)
 
-                idx['_type'] = 'py_custom'
-                idx['_source'] = {}
-                idx['_source']['@timestamp'] = dt_ini
-                idx['_source']['@timestamp_import'] = datetime.now(utc)
-                idx['_source']['domain'] = row[0]
-                idx['_source']['hosthame'] = row[1]
-                idx['_source']['process'] = row[2]
-                idx['_source']['resource'] = row[4]
-                idx['_source']['value'] = row[13]
+                for row in curs.fetchall():
+                
+                    data = {}
+                    data['@timestamp'] = dt_ini
+                    data['domain'] = row[0]
+                    data['hosthame'] = row[1]
+                    data['process'] = row[2]
+                    data['resource'] = row[4]
+                    data['value'] = row[13]
 
-                idx['_id'] = re.replace('[[:punct:]]', 
+                    idx_id = util.get_index_id(
 
-                    "id_%s_%s_%s" % (
-                        idx['_source']['@timestamp'],
-                        idx['_source']['process'],
-                        idx['_source']['resource']
+                        data['@timestamp'],
+                        data['process'],
+                        data['resource']
                     )
-                )
 
-            update_data.append(idx)
+                    update_data.append(util.create_index(data,IDX,idx_id))
 
-            dt = time_in_minute(dt, 1)
+            dt_process = util.time_in_minute(dt_process, 1)
 
     except (Exception, jaydebeapi.DatabaseError) as error:
         raise error
@@ -168,7 +122,10 @@ if __name__=="__main__":
         if curs is not None:
             curs.close()
 
-    helpers.bulk(ES,update_data)
-    ES.indices.refresh(index= IDX)
+    util.insert_ES(update_data)
+    
 
-    set_last_process_date()
+if __name__=="__main__":
+    """
+    """
+    start_process()
